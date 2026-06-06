@@ -1,96 +1,80 @@
-[Read this in English](README-en.md)
+**Português (Brasil)** | [English](README.en.md)
 
-# Fix de Sincronização de Horário (NTP) para Operadora de Internet VIVO.
+# Correção de horário do Windows para clientes Vivo
 
-Este repositório contém uma solução para um problema recorrente em que computadores com Windows conectados à rede da operadora Vivo não conseguem sincronizar o relógio com os servidores de tempo padrão da Microsoft (`time.windows.com`).
+Alguns clientes da Vivo no Brasil não conseguem sincronizar o relógio do
+Windows com o servidor de horário padrão da Microsoft. Este projeto configura o
+Windows para usar os servidores públicos do NTP.br.
 
-## O Problema
+## Baixar e executar
 
-A rede da Vivo aparenta ter um bloqueio ou instabilidade que impede a comunicação com servidores de horário (NTP) internacionais. Isso pode causar erros em:
-- Certificados de segurança de sites (erros de SSL/TLS).
-- Autenticação em serviços online e de jogos.
-- Funcionamento de softwares que dependem da hora correta.
+[Baixar a versão mais recente](https://github.com/lucasvhol/vivo-windows-ntp-fix/releases/latest/download/vivo-windows-ntp-fix.zip)
 
-## A Solução
+1. Baixe e extraia o arquivo `vivo-windows-ntp-fix.zip`.
+2. Dê dois cliques em `Instalar-Correcao-Horario-Vivo.bat`.
+3. Confirme a solicitação de administrador do Windows.
+4. Pressione ENTER e aguarde a mensagem de sucesso.
 
-A solução consiste em configurar o Windows para utilizar os servidores de horário públicos e oficiais do Brasil, mantidos pelo projeto **NTP.br**. Esses servidores são de alta precisão e estão localizados no Brasil, não sendo afetados pelo bloqueio da operadora.
+Os dois arquivos do ZIP devem permanecer na mesma pasta. O instalador usa
+somente componentes nativos do Windows e não instala um aplicativo em segundo
+plano.
 
----
+O Windows pode exibir um aviso de segurança porque os scripts não possuem
+assinatura digital. Baixe versões somente deste repositório.
 
-## Como Usar
+## Requisitos
 
-Existem três maneiras de aplicar a correção. Escolha a que você se sentir mais confortável.
+- Windows 10 ou Windows 11
+- Uma conta com permissão de administrador
+- Acesso de rede à porta UDP 123
 
-### Opção 1 (Recomendada para a maioria dos usuários): Arquivo de Registro `.reg`
+O instalador é interrompido sem fazer alterações quando o serviço de horário é
+controlado por Política de Grupo. Ele também é interrompido em computadores
+associados a domínio para não substituir a configuração de uma organização.
 
-Este é o método mais simples e direto.
+## O que será alterado
 
-1.  **Baixe o arquivo:** Clique [aqui](https://github.com/lucasvhol/VivoNTPFix/raw/main/ntpbrasil.reg) para baixar o arquivo `fix-ntp-vivo.reg`.
-2.  **Execute o arquivo:** Encontre o arquivo na sua pasta de Downloads e dê um duplo-clique nele.
-3.  **Confirme as alterações:** O Windows exibirá duas janelas de confirmação.
-    *   A primeira é um Aviso de Segurança do Controle de Conta de Usuário (UAC). Clique em **"Sim"**.
-    *   A segunda é do Editor de Registro, perguntando se você deseja continuar. Clique em **"Sim"**.
-    
-4.  **Pronto!** Os servidores já foram adicionados. Para ativar um deles, siga os passos da seção "Como Verificar se Funcionou".
+O instalador:
 
-### Opção 2 (Automatizada): Script Batch `.bat`
+1. Adiciona os servidores públicos do NTP.br à lista de horários do Windows.
+2. Configura `a.ntp.br`, `b.ntp.br` e `c.ntp.br` como fontes ativas.
+3. Inicia ou reinicia o serviço Horário do Windows.
+4. Tenta sincronizar o relógio até três vezes.
+5. Informa sucesso somente quando o Windows confirma uma fonte `ntp.br`.
 
-Este método faz tudo automaticamente: adiciona os servidores, define um como padrão e já força a sincronização do relógio.
+A execução pode ser repetida sem duplicar a configuração.
 
-1.  **Baixe o arquivo:** Clique [aqui](https://github.com/lucasvhol/VivoNTPFix/raw/main/fix-ntp-vivo.bat) para baixar o arquivo `fix-ntp-vivo.bat`.
-2.  **Execute como Administrador:** Encontre o arquivo na sua pasta de Downloads, clique nele com o **botão direito** e selecione a opção **"Executar como administrador"**.
-    
-3.  **Siga as instruções:** Uma tela preta de terminal irá se abrir e guiar o processo. Ao final, seu relógio já estará sincronizado.
+## Verificação manual
 
-### Opção 3 (Para Usuários Avançados): Script PowerShell `.ps1`
+Abra o PowerShell ou Prompt de Comando como administrador:
 
-Esta opção é recomendada para administradores de sistema ou usuários familiarizados com o PowerShell.
+```powershell
+w32tm /query /source
+w32tm /query /peers
+w32tm /query /status
+```
 
-1.  **Baixe o arquivo:** Clique [aqui](https://github.com/lucasvhol/VivoNTPFix/raw/main/fix-ntp-vivo.ps1) para baixar o arquivo `fix-ntp-vivo.ps1`.
-2.  **Execute com o PowerShell:** Por padrão, o Windows bloqueia a execução de scripts. A forma mais fácil de executar é:
-    *   Encontrar o arquivo na sua pasta de Downloads.
-    *   Clicar com o **botão direito** sobre ele.
-    *   Selecionar a opção **"Executar com o PowerShell"**.
-3.  **Confirme a elevação:** O script pedirá privilégios de administrador. Aceite no prompt do UAC. Ele fará o resto do trabalho automaticamente.
+A fonte exibida deve conter `ntp.br`.
 
----
+## Solução de problemas
 
-## Como Verificar se Funcionou
+- Extraia o ZIP antes de executar. Não abra o instalador pela visualização do
+  arquivo compactado.
+- Se nenhuma fonte responder, confira se firewall, roteador ou provedor permite
+  tráfego NTP pela porta UDP 123.
+- Se uma empresa ou escola administra o computador, procure o responsável de
+  TI.
+- NTP corrige a hora UTC. Fuso horário e horário de verão são configurações
+  separadas do Windows.
 
-Você pode confirmar que a configuração foi aplicada de duas formas:
+## Uso avançado
 
-#### Verificação Manual (Interface Gráfica)
+Administradores podem executar `fix-ntp-vivo.ps1` diretamente. O script aceita
+`-Yes`, `-NoPause` e `-AllowDomainMember`. A última opção deve ser usada apenas
+por quem conhece a configuração de horário do domínio.
 
-1.  Abra o **Painel de Controle**.
-2.  Vá para **"Relógio e Região"** > **"Data e Hora"**.
-3.  Na aba **"Horário na Internet"**, clique em **"Alterar configurações..."**.
-4.  Na lista de servidores, você verá os novos endereços do `ntp.br`. Selecione um e clique em **"Atualizar agora"**.
+## Referências
 
-
-
-#### Verificação via Linha de Comando
-
-1. Abra o **Prompt de Comando** ou **PowerShell**.
-2. Digite o comando abaixo e pressione Enter:
-   ```
-   w32tm /query /peers
-   ```
-3. A saída deve mostrar o servidor do `ntp.br` que está sendo usado para sincronia.
-
-## Detalhes Técnicos
-
-Os scripts e o arquivo `.reg` modificam a seguinte chave do Registro do Windows, que armazena a lista de servidores NTP disponíveis na interface gráfica:
-
-`HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\DateTime\Servers`
-
-Os servidores adicionados são:
-- `a.st1.ntp.br`
-- `b.st1.ntp.br`
-- `c.st1.ntp.br`
-- `d.st1.ntp.br`
-- `a.ntp.br`
-- `b.ntp.br`
-- `c.ntp.br`
-- `gps.ntp.br`
-
-Os scripts `.bat` e `.ps1` também executam os comandos `net stop/start w32time` e `w32tm /resync` para forçar a aplicação imediata das novas configurações.
+- [Guia oficial do NTP.br para Windows](https://ntp.br/guia/windows/)
+- [Estrutura oficial dos servidores NTP.br](https://ntp.br/conteudo/estrutura/)
+- [Documentação do serviço Horário do Windows](https://learn.microsoft.com/windows-server/networking/windows-time-service/windows-time-service-tools-and-settings)
