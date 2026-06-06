@@ -1,0 +1,137 @@
+name: Validate and release
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Validate with Windows PowerShell 5.1
+        shell: powershell
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+              (Resolve-Path '.\fix-ntp-vivo.ps1'),
+              [ref]$tokens,
+              [ref]$errors
+          ) | Out-Null
+          if ($errors.Count -gt 0) {
+              $errors | Format-List Message, Extent
+              exit 1
+          }
+
+      - name: Validate with PowerShell 7
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+              (Resolve-Path '.\fix-ntp-vivo.ps1'),
+              [ref]$tokens,
+              [ref]$errors
+          ) | Out-Null
+          if ($errors.Count -gt 0) {
+              $errors | Format-List Message, Extent
+              exit 1
+          }
+
+      - name: Validate distribution files
+        shell: pwsh
+        run: |
+          $requiredFiles = @(
+              '.\Instalar-Correcao-Horario-Vivo.bat'
+              '.\fix-ntp-vivo.ps1'
+              '.\README.md'
+              '.\README.en.md'
+          )
+          foreach ($file in $requiredFiles) {
+              if (-not (Test-Path -LiteralPath $file -PathType Leaf)) {
+                  throw "Required file is missing: $file"
+              }
+          }
+
+          $removedFiles = @(
+              '.\fix-ntp-vivo.bat'
+              '.\fix-ntp-vivo.reg'
+              '.\README-en.md'
+          )
+          foreach ($file in $removedFiles) {
+              if (Test-Path -LiteralPath $file) {
+                  throw "Obsolete file is still present: $file"
+              }
+          }
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: validate
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Build release ZIP
+        shell: pwsh
+        run: |
+          $packagePath = Join-Path $env:RUNNER_TEMP 'vivo-windows-ntp-fix'
+          New-Item -ItemType Directory -Path $packagePath | Out-Null
+
+          Copy-Item -LiteralPath '.\Instalar-Correcao-Horario-Vivo.bat' `
+              -Destination $packagePath
+          Copy-Item -LiteralPath '.\fix-ntp-vivo.ps1' `
+              -Destination $packagePath
+
+          $archivePath = Join-Path $env:GITHUB_WORKSPACE `
+              'vivo-windows-ntp-fix.zip'
+          Compress-Archive `
+              -Path (Join-Path $packagePath '*') `
+              -DestinationPath $archivePath
+
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $archive = [System.IO.Compression.ZipFile]::OpenRead($archivePath)
+          try {
+              $entries = @($archive.Entries | ForEach-Object { $_.FullName })
+          }
+          finally {
+              $archive.Dispose()
+          }
+
+          $expectedEntries = @(
+              'Instalar-Correcao-Horario-Vivo.bat'
+              'fix-ntp-vivo.ps1'
+          )
+          if (
+              $entries.Count -ne $expectedEntries.Count -or
+              (Compare-Object $entries $expectedEntries)
+          ) {
+              throw "Unexpected release contents: $($entries -join ', ')"
+          }
+
+      - name: Create GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create $env:GITHUB_REF_NAME `
+              '.\vivo-windows-ntp-fix.zip' `
+              --generate-notes `
+              --title "Vivo Windows NTP Fix $env:GITHUB_REF_NAME"
